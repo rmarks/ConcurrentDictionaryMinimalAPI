@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Http.HttpResults;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -11,29 +14,47 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+var products = new ConcurrentDictionary<int,Product>();
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/products", () => products);
+
+app.MapPost("/products", (Product product) => 
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+    product.Id = products.Any() ? products.Count + 1 : 1;
+
+    return products.TryAdd(product.Id, product) 
+            ? Results.Created("/products/{product.Id}", product) 
+            : Results.BadRequest();
+});
+
+app.MapGet("/products/{id}", (int id) =>
+{
+    return products.TryGetValue(id, out var product)
+            ? Results.Ok(product)
+            : Results.NotFound();
+});
+
+app.MapPut("/products/{id}", (int id, Product product) =>
+{
+    if (!products.TryGetValue(id, out var productToUpdate)) return Results.NotFound();
+
+    products[id] = product;
+
+    return Results.NoContent();
+});
+
+app.MapDelete("/products/{id}", (int id) => 
+{
+    return products.TryRemove(id, out _)
+            ? Results.NoContent()
+            : Results.BadRequest();
+});
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+class Product
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Stock { get; set; }
 }
