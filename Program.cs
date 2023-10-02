@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,7 +35,9 @@ app.MapGet("/products/{id}", (int id) =>
 
 app.MapPut("/products/{id}", (int id, Product product) =>
 {
-    if (!products.TryGetValue(id, out var productToUpdate)) return Results.NotFound();
+    if (id != product.Id) return Results.BadRequest();
+
+    if (!products.TryGetValue(id, out _)) return Results.NotFound();
 
     products[id] = product;
 
