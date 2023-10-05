@@ -17,12 +17,14 @@ var products = new ConcurrentDictionary<int,Product>();
 
 app.MapGet("/products", () => products);
 
-app.MapPost("/products", (Product product) => 
+app.MapPost("/products", (CreateProductDto newProduct) => 
 {
-    product.Id = products.Any() ? products.Count + 1 : 1;
+    int newId = products.Any() ? products.Count + 1 : 1;
 
-    return products.TryAdd(product.Id, product) 
-            ? Results.Created("/products/{product.Id}", product) 
+    Product productToAdd = new() { Id = newId, Name = newProduct.Name, Stock = newProduct.Stock };
+
+    return products.TryAdd(newId, productToAdd) 
+            ? Results.Created($"/products/{newId}", productToAdd) 
             : Results.BadRequest();
 });
 
@@ -48,7 +50,7 @@ app.MapDelete("/products/{id}", (int id) =>
 {
     return products.TryRemove(id, out _)
             ? Results.NoContent()
-            : Results.BadRequest();
+            : Results.NotFound();
 });
 
 app.Run();
@@ -59,3 +61,5 @@ class Product
     public string Name { get; set; } = string.Empty;
     public int Stock { get; set; }
 }
+
+record CreateProductDto(string Name, int Stock);
