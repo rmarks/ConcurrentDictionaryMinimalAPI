@@ -4,14 +4,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
-// if (app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseExceptionHandler();
 }
+
+app.UseStatusCodePages();
+app.UseSwagger();
+app.UseSwaggerUI();
 
 var products = new ConcurrentDictionary<int,Product>();
 
@@ -24,21 +28,30 @@ app.MapPost("/products", (CreateProductDto newProduct) =>
     Product productToAdd = new() { Id = newId, Name = newProduct.Name, Stock = newProduct.Stock };
 
     return products.TryAdd(newId, productToAdd) 
-            ? Results.Created($"/products/{newId}", productToAdd) 
-            : Results.BadRequest();
+            ? TypedResults.Created($"/products/{newId}", productToAdd) 
+            : Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    { "id", new[] { "A product with this id already exists" } }
+                });
 });
 
 app.MapGet("/products/{id}", (int id) =>
 {
     return products.TryGetValue(id, out var product)
-            ? Results.Ok(product)
+            ? TypedResults.Ok(product)
             : Results.NotFound();
 });
 
 app.MapPut("/products/{id}", (int id, Product product) =>
 {
-    if (id != product.Id) return Results.BadRequest();
-
+    if (id != product.Id) 
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> 
+                { 
+                    { "id", new[] { "The id in the URL conflicts with the product id" } }
+                });
+    }
+    
     if (!products.TryGetValue(id, out _)) return Results.NotFound();
 
     products[id] = product;
