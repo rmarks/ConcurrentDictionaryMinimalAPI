@@ -1,0 +1,38 @@
+name: Continous Integration and Deployment
+
+on: 
+  push:
+    branches:
+      - main
+
+env:
+  DOTNET_VERSION: '7.0.x'
+  AZURE_WEBAPP_NAME: cd-minimal-api-app
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code 🛎
+              uses: actions/checkout@v4
+            
+            - name: Setup .NET 7 🔧
+              uses: actions/setup-dotnet@v3
+              with:
+                dotnet-version: ${{ env.DOTNET_VERSION }}
+
+            - name: Restore dependencies 🛠
+              run: dotnet restore
+
+            - name: Build app 🚀
+              run: dotnet build -c Release --no-restore
+
+            - name: Publish app 📰
+              run: dotnet publish -c Release -o ./out
+
+            - name: Deploy to Azure Web Apps 🚢
+              uses: azure/webapps-deploy@v2
+              with:
+                app-name: ${{ env.AZURE_WEBAPP_NAME }}
+                publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_SECRET }}
+                package: ./out
